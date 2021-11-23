@@ -7,16 +7,17 @@ if len(sys.argv) != 3:
 
 p = puz.read(sys.argv[1])
     
-
-try:
-    with open(sys.argv[2]) as f:
-        asm = f.readlines()
-except:
-    print("Error reading asm file")
-    exit(1)
+with open(sys.argv[2]) as f:
+    asm = f.readlines()
+    
+if "puz_len:    equ " + str(len(p.tobytes())) + "\n" in asm and \
+   p.tobytes()[:2] == b'\xeb\x1e':
+    print("Puzzle and ASM look like they match.")
+    print("Skipping prebuild...")
+    exit(0)
 
 # PUZ prebuild edits
-    
+
 # strip author, title, copyright, and notes to save space
 p.author = ""
 p.title = ""
@@ -36,8 +37,8 @@ p.unk2 = b'\xe9' + (puz_len - 0x23).to_bytes(2, "little") + b'\x00'*9
 # easier with itertools but want to keep dependencies down
 # even easier to calculate directly but idc, I just want a basic build system up
 valid_jumps = False
-for i in range(256):
-    for j in range(256):
+for i in range(1,256): 
+    for j in range(1,256):
         p.notes = bytes([i] + [0x41]*7 + [j]).decode("ISO8859")
         if p.tobytes()[:2] == b'\xeb\x1e':
             valid_jumps = True

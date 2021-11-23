@@ -26,40 +26,64 @@ start:
 	
 	mov ax, 0xb800				; Load text video segment
 	mov es, ax					; in ES for stosw instructions using DI
-	xor ax, ax
 	
-	;; Clear screen - is this necessary?
-	;; seems like setting the video mode above does this
-	;; 	xor ax, ax					; Zero out AX
-	;; 	mov ch, 8					; Set count to 0x800
-	;; 	rep stosw					; set video segment to null
-
-	;; Not necessary anymore with prebuild and using immediates
-	;;	mov cl, width			    ; Calculate total number of cells
-	;; 	mov al, height
-	;; 	mul cx
-	;; 	mov [num_cells], ax			; save the result in num_cells
-
-	;; just prints the solution in a simple grid for now
 print_puzzle:
-	xor di, di
+	xor ax, ax					; Zero out AX and DI 
+	xor bx, bx					; BL=x value BH=y value
+	xor cx, cx					; 
+	xor dx, dx					; clue count
+
+	xor di, di					; ES:DI points to beginning of video memory
 	
-	mov bl, height
+p1:	call print_line_row			; print the row with lines (e.g. +-+-+-+)
+	call print_text_row			; prints the row with text (e.g. | | | |)
+
+	xor bl, bl
+	inc bh
+	cmp bh, height				; check if end of crossword
+	jnz p1
 	
-	mov si, solution			; load solution
-p1:	mov cl, width
-p2:	lodsb 						; load byte of solution from DS:SI to AL
-	mov ah, 0x78
+	call print_line_row
+	
+	jmp main
+
+print_line_row:
+	mov byte cl, width
+p2:	call handle_clue
+	stosw
+	mov ax, 0x0f2d
+	stosw
+
+	
+	inc bl
+	cmp bl, width
+	jz p3
+
+	jmp p2
+	
+p3:	mov ax, 0x0f2b				; adds the final "+" and then goes to the next
+	stosw						; line, calculated using 2 bytes per char and
+	add di, 0xa0-(4*width+2)	; 2 chars per cell with the extra +
+	ret
+
+	
+print_text_row:
+	mov cl, width+1
+	;; lodsb 						; load byte of solution from DS:SI to AL
+p4:	mov ax, 0x0f7c
+	stosw
+	mov ax, 0x0f20				; White on black background color
 	stosw						; store AX in ES:DI
-	loop p2						; loop it
+	loop p4						; loop it
 	
-	sub byte bl, 1				; check if end of crossword
-	jz main
+	add di, 0xa0-(4*width+4)		; next line
+	ret
 	
-	add di, 0xa0-(width*2) 				; go to the next line
-	;; 	sub di, [puz_width]
-		
-	jmp p1
+	;; 	returns just a simple "+" for now
+handle_clue:	
+	mov ax, 0x0F2B
+	ret
+	
 	
 main:							; main loop
 	jmp main
