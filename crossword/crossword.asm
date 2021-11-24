@@ -8,17 +8,24 @@ cpu 8086
 puz_len:    equ 232
 width:      equ 4
 height:     equ 4
-;; -----------------
 
+;; other immediates
+col_width:	equ 25
+indent:		equ 4
+
+	
 puz_off:	equ 0x7c00
-acrossmsg:	equ puz_off + 0x2 	; In .puz specification
-downmsg:	equ puz_off + 0xa
+across_msg:	equ puz_off + 0x2 	; In .puz specification
+down_msg:	equ puz_off + 0x9
+solution:	equ puz_off + 0x34
+
+	;; no longer needed - using these as immediates
 	;; puz_width:	equ puz_off + 0x2c
 	;; puz_height:	equ puz_off + 0x2d
-solution:	equ puz_off + 0x34
-	
-num_cells:	equ puz_off + 0x30	; user defined
-cur_clue:	equ puz_off + 0x2f
+
+	;; Not in .puz specification - used as storage over those dumb checksums
+next_aclue:	equ puz_off + 0x10
+next_dclue:	equ puz_off + 0x12
 	
 start:
 	mov ax, 0x0002				; Set Video mode 80x25 with color
@@ -32,6 +39,8 @@ print_puzzle:
 	xor bx, bx					; BL=x value BH=y value
 	xor cx, cx					; 
 	xor dx, dx					; clue count
+
+	call init_clues
 
 	xor di, di					; ES:DI points to beginning of video memory
 	
@@ -76,14 +85,37 @@ p4:	mov ax, 0x0f7c
 	stosw						; store AX in ES:DI
 	loop p4						; loop it
 	
-	add di, 0xa0-(4*width+4)		; next line
+	add di, 0xa0-(4*width+4)	; next line
 	ret
 	
-	;; 	returns just a simple "+" for now
+	;; main logic function for printing clues and numbering cells correctly
 handle_clue:	
 	mov ax, 0x0F2B
 	ret
 	
+init_clues:	
+	mov di, (col_width+indent)*2 ; print ACROSS at the top of col 2
+	mov si, across_msg
+	mov cl, 6
+i1: lodsb
+	mov ah, 0x0f
+	stosw
+	loop i1
+
+	mov [next_aclue], 0xa0+col_width*2 ; next across clue goes under ACROSS
+	
+	mov di, col_width*4 + indent*2 ;print DOWN at the top of col 3
+	mov si, down_msg
+	mov cl, 4
+i2:	lodsb
+	mov ah, 0x0f
+	stosw
+	loop i2
+
+	mov [next_dclue], 0xa0+col_width*4 ; next down clue goes right under DOWNx
+	
+	ret
+
 	
 main:							; main loop
 	jmp main
