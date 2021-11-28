@@ -118,19 +118,23 @@ handle_clue:
 	cmp byte [bx], 0x2e
 	jne h2
 
-h1:	mov bx, next_aloc
+h1:	push bx
+	mov bx, next_aloc
 	call print_clue
+	pop bx
 	mov al, 1
 	
 	;; if dh=0 or the cell above is '.', handle down clue
 h2:	cmp dh, 0
 	je 	h3
-	sub bx, width+1				; check the above row
+	sub bx, width-1				; check the above row
 	cmp byte [bx], 0x2e				; accounting for previous dec
 	jne h4
 	
-h3:	mov bx, next_dloc
+h3:	push bx
+	mov bx, next_dloc
 	call print_clue
+	pop bx
 	mov al, 1
 
 h4:	cmp al, 1					; dh contains whether a clue number exists
