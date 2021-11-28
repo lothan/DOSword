@@ -5,9 +5,9 @@ org 0x7c00
 cpu 8086
 
 ;; changed by prebuild.py to load puzzle data as immediates 
-puz_len:    equ 232
-width:      equ 4
-height:     equ 4
+puz_len:    equ 157
+width:      equ 3
+height:     equ 3
 
 ;; other immediates
 col_width:	equ 25
@@ -19,6 +19,7 @@ across_msg:	equ puz_off + 0x2 	; In .puz specification
 down_msg:	equ puz_off + 0x9
 solution:	equ puz_off + 0x34
 grid:		equ puz_off + 0x34 + (width*height)
+clues:		equ grid + (width*height) + 3 ; after the grid and 3 null bytes
 
 	;; no longer needed - using these as immediates
 	;; puz_width:	equ puz_off + 0x2c
@@ -106,18 +107,19 @@ handle_clue:
 	mov bx, ax
 	cmp byte [bx], 0x2e
 	je	h5
+	cmp dh, height				; if its the last row, don't handle across clue
+	je h5
 	xor ax, ax
 	
 	;; if dl=0 or the cell to the left is '.', handle across clue
-	cmp dh, height				; if its the last row, don't handle across clue
-	je h2
 	dec bx						; ax is pointing at the current grid location
 	cmp dl, 0					; so a simple dec bx should check the cell to the left
 	je h1						
 	cmp byte [bx], 0x2e
 	jne h2
 
-h1:	call handle_aclue
+h1:	mov bx, next_aloc
+	call print_clue
 	mov al, 1
 	
 	;; if dh=0 or the cell above is '.', handle down clue
@@ -127,7 +129,8 @@ h2:	cmp dh, 0
 	cmp byte [bx], 0x2e				; accounting for previous dec
 	jne h4
 	
-h3:	call handle_dclue
+h3:	mov bx, next_dloc
+	call print_clue
 	mov al, 1
 
 h4:	cmp al, 1					; dh contains whether a clue number exists
@@ -142,7 +145,51 @@ h4:	cmp al, 1					; dh contains whether a clue number exists
 h5:	mov ax, 0x0F2B				; return a simple "+" for the cross
 	ret
 
-handle_aclue:
+
+print_clue:
+	push ax
+	push di
+	push si
+
+	mov word di, [bx]			; load location for next clue
+	
+	mov word ax, [cur_clue]
+	stosw						; this is inefficient as hell to print ("1.  "
+	mov ax, 0x0f2e
+	stosw
+	mov ax, 0x0f20
+	stosw
+	mov ax, 0x0f20
+	stosw
+	mov word si, [next_clue]
+	
+a1:	mov ax, [bx]
+	add ax, col_width*2-2
+	cmp ax, di
+	jne a2
+	mov ax, 0x0f5c
+	stosw
+	mov di, [bx] 		; if so, go to the next line
+	add di, 0xa0
+	mov [bx], di
+	add di, indent*2
+
+a2:	lodsb
+	cld
+	cmp byte al, 0
+	je a3
+	mov ah, 0x0f
+	stosw
+	jmp a1
+	
+a3:	mov word [next_clue], si
+	
+	mov di, [bx]
+	add di, 0xa0
+	mov [bx], di
+	pop si
+	pop di
+	pop ax
 	ret
 	
 handle_dclue:	
@@ -158,7 +205,7 @@ i1: lodsb
 	stosw
 	loop i1
 
-	mov word [next_aloc], 0xa0+col_width*2 ; next across clue goes under ACROSS
+	mov word [next_aloc], 0xa0+col_width*2			;next across clue goes under ACROSS
 	
 	mov di, col_width*4 + indent*2 ;print DOWN at the top of col 3
 	mov si, down_msg
@@ -171,6 +218,7 @@ i2:	lodsb
 	mov word [next_dloc], 0xa0+col_width*4 ; next down clue goes right under DOWNx
 	
 	mov word [cur_clue], 0x0f31
+	mov word [next_clue], clues	
 	ret
 
 	
