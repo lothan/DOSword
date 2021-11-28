@@ -63,43 +63,41 @@ p1:	call print_line_row			; print the row with lines (e.g. +-+-+-+)
 
 print_line_row:
 	mov byte cl, width
-p2:	call handle_clue
+p2:	call handle_clue			; returns "+" or current clue number
 	stosw
-	mov ax, 0x0f2d
+	mov al, 0x2d				; "-" for inbetween cells (i.e 3-+-+)
 	stosw
 	
-	inc dl
+	inc dl						; end of the row? break out of loop
 	cmp dl, width
 	jz p3
 
 	jmp p2
 	
-p3:	mov ax, 0x0f2b				; adds the final "+" and then goes to the next
+p3:	mov al, 0x2b				; adds the final "+" and then goes to the next
 	stosw						; line, calculated using 2 bytes per char and
 	add di, 0xa0-(4*width+2)	; 2 chars per cell with the extra +
 	ret
 
-	
+
+	;; prints the row that should contain user inputted text (i.e. "| | | |)
 print_text_row:
 	mov cx, width+1
-	;; lodsb 						; load byte of solution from DS:SI to AL
-p4:	mov ax, 0x0f7c
+p4:	mov al, 0x7c				; prints "| " width+1 times
 	stosw
-	mov ax, 0x0f20				; White on black background color
-	stosw						; store AX in ES:DI
-	loop p4						; loop it
+	add di, 2
+	;; 	mov al, 0x20
+	;; 	stosw					
+	loop p4				
 	
-	add di, 0xa0-(4*width+4)	; next line
+	add di, 0xa0-(4*width+4)	
 	ret
 
 	;; main logic function for printing clues and numbering cells correctly
-	;; bx must be preserved - has (y,x) cords
-	;;
-	;; fuck so ax is not a valid memory location. need to use bx to point to grid
-	;; cx for current grid loc
-	;; and dx for clue number? or dx for grid loc and clue number in memory?
+	;; dx must be preserved - has (y,x) cords
+	;; bx is used for grid positioning checks
+	;; cl never used
 handle_clue:
-	xor bx, bx 					; if the current position is a black square '.'
 	mov ax, width	  			; (a '.' or 0x2e in the grid), then return a '+'
 	mul dh
 	add al, dl
@@ -108,7 +106,7 @@ handle_clue:
 	cmp byte [bx], 0x2e
 	je	h5
 	cmp dh, height				; if its the last row, don't handle across clue
-	je h5
+	je h6
 	xor ax, ax
 	
 	;; if dl=0 or the cell to the left is '.', handle across clue
@@ -128,7 +126,7 @@ h1:	push bx
 h2:	cmp dh, 0
 	je 	h3
 	sub bx, width-1				; check the above row
-	cmp byte [bx], 0x2e				; accounting for previous dec
+	cmp byte [bx], 0x2e			; accounting for previous dec
 	jne h4
 	
 h3:	push bx
@@ -138,15 +136,21 @@ h3:	push bx
 	mov al, 1
 
 h4:	cmp al, 1					; dh contains whether a clue number exists
-	jne h5						; in this cell. If not, return just a "+"
+	jne h6						; in this cell. If not, return just a "+"
 	
 	mov word bx, [cur_clue]		; return and increment a printable clue number
 	mov ax, bx
 	inc bl				 		; note: only works for clue numbers less than 10
 	mov word [cur_clue], bx
 	ret
-	
-h5:	mov ax, 0x0F2B				; return a simple "+" for the cross
+
+h5:
+	;; maybe some logic here for printing the black squares?
+	;; the correct place for that check is in print_text_row
+	;; but dx doesn't contain the correct xy cord and 
+	;; bx isn't pointing to the grid in the right place
+
+h6:	mov ax, 0x0F2B				; return a simple "+" for the cross
 	ret
 
 
