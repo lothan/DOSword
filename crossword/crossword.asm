@@ -241,11 +241,34 @@ i2:	lodsb
 	mov word [next_clue], clues	
 	ret
 
+	;;
+	;; Main loop
+	;; BX stores pointer to current grid location in puz file
+	;; DX stores location of cursor DL=ypos DH=xpos
+	;; (I know it's different than above, just now looking at int10 specs)
+main:
+
+	mov bx, grid
+	mov dx, 0x0101
+m1:	cmp byte [bx], 0x2e 		; if it's a black square:
+	jne m2
+	inc bx
+	add dl, 2
+	jmp m1
+		
+m2:	push bx
+	mov ah, 2
+	mov bh, 0
+	int 0x10
+	pop bx
 	
-main:							; main loop
+	mov ah, 0
+	int 0x16					; Keyboard services
 	jmp main
 	
 	;; Pad the rest of the file with null bytes and add
-	;; 0x55AA to the end to make the puzzle and code bootable 
-times (510-puz_len)-($-$$) db 0
-dw 0xAA55
+	;; 0x55AA to the end to make the puzzle and code bootable
+%if com=0
+	times (510-puz_len)-($-$$) db 0
+	dw 0xAA55
+%endif
