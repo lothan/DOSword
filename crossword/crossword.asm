@@ -155,10 +155,12 @@ h4:	cmp al, 1					; dh contains whether a clue number exists
 	ret
 
 h5:
-	;; maybe some logic here for printing the black squares?
-	;; the correct place for that check is in print_text_row
-	;; but dx doesn't contain the correct xy cord and 
-	;; bx isn't pointing to the grid in the right place
+	;; print a black square in the square down and to the right of current di
+	push di
+	add di, 0xa0+2
+	mov ax, 0x0fdb
+	stosw
+	pop di
 
 h6:	mov ax, 0x0F2B				; return a simple "+" for the cross
 	ret
