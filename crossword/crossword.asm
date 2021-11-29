@@ -1,9 +1,14 @@
 	;; Crossword puzzle bootloader
 
 bits 16
-org 0x7c00
 cpu 8086
-
+	
+%if	com
+	org 0x0100
+%else 
+	org 0x7c00
+%endif
+	
 ;; changed by prebuild.py to load puzzle data as immediates 
 puz_len:    equ 157
 width:      equ 3
@@ -14,7 +19,12 @@ col_width:	equ 25
 indent:		equ 4
 
 	
-puz_off:	equ 0x7c00
+%if com
+	puz_off:	equ 0x100
+%else
+	puz_off:	equ 0x7c00
+%endif
+	
 across_msg:	equ puz_off + 0x2 	; In .puz specification
 down_msg:	equ puz_off + 0x9
 solution:	equ puz_off + 0x34
@@ -232,7 +242,6 @@ i2:	lodsb
 	
 main:							; main loop
 	jmp main
-
 	
 	;; Pad the rest of the file with null bytes and add
 	;; 0x55AA to the end to make the puzzle and code bootable 
