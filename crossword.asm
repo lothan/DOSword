@@ -74,11 +74,11 @@ p1:	call print_line_row			; print the row with lines (e.g. +-+-+-+)
 premain:
 	mov dx, 0
 	mov bx, grid
-r1:	cmp byte [bx], 0x2e 		; if it's a black square, go to the next cell
+n1:	cmp byte [bx], 0x2e 		; if it's a black square, go to the next cell
 	jne update_cursor
 	add dl, 1
 	call load_grid_pos
-	jmp r1
+	jmp n1
 		
 	
 print_line_row:
@@ -315,16 +315,54 @@ l2:	dec dl						; actually go left
 	;; move one square up, skipping and wrapping over edges and black squares
 handle_up:
 	cmp word dx, 0				; if in the top left, 
+	jne u1
+	mov dh, height				; go to the bottom right
+	mov dl, width-1
+	jmp u2
+u1:	cmp dh, 0 					; if top row (y=0)
+	jne u2
+	mov dh, height				; go to the bottom
+	dec dl						; of the previous row
+u2:	dec dh
+	call load_grid_pos
+	cmp byte [bx], 0x2e
+	je handle_up
+	jmp update_cursor
 
-	
+	;; move one square right, skipping and wrapping over edges and black squares
 handle_right:
+	cmp dl, width-1				; if furthest right col, go to start of line
+	jne r2					
+	mov dl, 0
+	cmp dh, height-1			; if furthest bottom row 
+	jne r1
+	mov dh, 0					; go to the first row
+	jmp r3
+r1:	inc dh						; there is an easier way to write this I'm sure
+	jmp r3						; but this works and I'm not drawing a flow chart
+r2:	inc dl						; for a crappy asm game coded over break
+r3:	call load_grid_pos
+	cmp byte [bx], 0x2e			; if there is a black square
+	je handle_right				; go right once more
+	jmp update_cursor	
 
-	mov ax, 0x0f44
-	stosw
+	;; move one square down, skipping and wrapping over edges and black squares
 handle_down:
-	
-	mov ax, 0x0f45
-	stosw
+	cmp dh, height-1			; if furthest bottom row, go to the top row
+	jne d2					
+	mov dh, 0
+	cmp dl, width-1				; if furthest right col 
+	jne d1
+	mov dl, 0					; go to the top left
+	jmp d3
+d1:	inc dl					
+	jmp d3				
+d2:	inc dh			
+d3:	call load_grid_pos
+	cmp byte [bx], 0x2e			; if there is a black square
+	je handle_down				; go down once more
+	jmp update_cursor	
+
 handle_letter:
 	mov ax, 0x0f42
 	stosw
