@@ -10,9 +10,9 @@ cpu 8086
 %endif
 	
 ;; changed by prebuild.py to load puzzle data as immediates 
-puz_len:    equ 157
-width:      equ 3
-height:     equ 3
+puz_len:    equ 232
+width:      equ 4
+height:     equ 4
 
 ;; other immediates
 col_width:	equ 25
@@ -197,7 +197,7 @@ a1:	mov ax, [bx]
 	add ax, col_width*2-2
 	cmp ax, di
 	jne a2
-	mov ax, 0x0f5c
+	mov ax, 0x0f20
 	stosw
 	mov di, [bx] 		; if so, go to the next line
 	add di, 0xa0
@@ -363,11 +363,55 @@ d3:	call load_grid_pos
 	je handle_down				; go down once more
 	jmp update_cursor	
 
+
+	;; displays letter at cursor position
+	;; and saves letter to grid in memory
 handle_letter:
-	mov ax, 0x0f42
+	;; Write character to cursor position 
+	add al, 0x21 				; change offset to capital letters
+	mov ah, 0x09
+	mov bh, 0
+	mov bl, 0x0f
+	mov cx, 1
+	int 0x10
+
+	;; add to grid in memory
+	push ax
+	call load_grid_pos
+	pop ax
+	mov byte [bx], al			; moves character to memory position
+
+	;; checks the solution to see if puzzle is complete
+	mov cx, width*height
+	mov bx, solution
+	mov si, grid
+s1:	lodsb
+	cmp byte al, [bx]
+	jne s2
+	inc bx
+	loop s1
+
+	jmp handle_win
+
+s2:	jmp handle_right
+
+	;; prints "YOU WIN!" and 
+handle_win:	
+	mov cx, 9
+	mov si, win_msg+puz_len
+	mov di, 0xa0*(height+1)*2
+	mov ah, 0x0f
+w1:	lodsb
 	stosw
-	jmp update_cursor
-		
+	loop w1
+
+	mov ah, 0
+	int 0x16
+	jmp handle_escape
+	
+
+win_msg: db "YOU WIN!!", 0
+	
 	;; reads position from dx (DL=xpos DH=ypos)
 	;; and points the current grid position
 load_grid_pos:
