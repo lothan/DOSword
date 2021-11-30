@@ -68,9 +68,19 @@ p1:	call print_line_row			; print the row with lines (e.g. +-+-+-+)
 	jnz p1
 	
 	call print_line_row
-	
-	jmp main
 
+	;; initialize cursor location to the first empty cell
+	;; jmps to update_cursor, which jmps to main
+premain:
+	mov dx, 0
+	mov bx, grid
+r1:	cmp byte [bx], 0x2e 		; if it's a black square, go to the next cell
+	jne update_cursor
+	add dl, 1
+	call load_grid_pos
+	jmp r1
+		
+	
 print_line_row:
 	mov byte cl, width
 p2:	call handle_clue			; returns "+" or current clue number
@@ -242,28 +252,110 @@ i2:	lodsb
 	ret
 
 	;;
-	;; Main loop
+	;; Main interactive code run after printing the puzzle
 	;; BX stores pointer to current grid location in puz file
-	;; DX stores location of cursor DL=ypos DH=xpos
+	;; DX stores location of cursor DL=xpos DH=ypos
 	;; (I know it's different than above, just now looking at int10 specs)
+	;; wtf I read it wrong and it's actually as I originally had it?
 main:
+	mov ah, 0
+	int 0x16					; Read input
 
-	mov bx, grid
-	mov dx, 0x0101
-m1:	cmp byte [bx], 0x2e 		; if it's a black square:
-	jne m2
-	inc bx
-	add dl, 2
-	jmp m1
+	cmp al, 0x1b				; Escape key
+	je handle_escape
+
+
+	;; no idea where these numbers came from, windows doc has it wrong
+	;; Got these from here:
+	;; https://stackoverflow.com/questions/16939449/how-to-detect-arrow-keys-in-16-bit-dos-code
+	cmp ah, 0x4B				; Left arrow
+	je handle_left
+	cmp ah, 0x48				; Up arrow
+	je handle_up
+	cmp ah, 0x4d				; Right arrow
+	je handle_right
+	cmp ah, 0x50				; Down arrow
+ 	je handle_down
+
+	sub al, 0x41				; Letter input
+	cmp al, 26
+	ja handle_letter
+	
+	jmp main
+
+handle_escape:
+	mov di, 0					; clear screen
+	mov cx, 0xfa0
+	mov ax, 0x0f00
+e1: stosw
+	loop e1
+	
+	int 0x20					; and quit
+	
+	;; move one square to the left, skipping over black squares
+	;; and wrapping around to the previous row if dh=0
+	;; I think I can do this with much fewer instructions
+	;; if I knew how flags worked (dec first, ask questions later)
+handle_left:
+	cmp word dx, 0 				; if in the top left, go to bottom right
+	jne l1					
+	mov dh, height-1
+	mov dl, width
+	jmp l2
+l1:	cmp dl, 0					; if furthest left col (x=0)
+	jne l2
+	mov dl, width				; go to end of previous line
+	dec dh
+l2:	dec dl						; actually go left
+	call load_grid_pos
+	cmp byte [bx], 0x2e			; if there is a black square
+	je handle_left				; go left once more
+	jmp update_cursor
+
+	;; move one square up, skipping and wrapping over edges and black squares
+handle_up:
+	cmp word dx, 0				; if in the top left, 
+
+	
+handle_right:
+
+	mov ax, 0x0f44
+	stosw
+handle_down:
+	
+	mov ax, 0x0f45
+	stosw
+handle_letter:
+	mov ax, 0x0f42
+	stosw
+	jmp update_cursor
 		
-m2:	push bx
+	;; reads position from dx (DL=xpos DH=ypos)
+	;; and points the current grid position
+load_grid_pos:
+	mov al, dh
+	cbw
+	mov cl, width
+	mul cl
+	add al, dl
+	mov bx, grid
+	add bx, ax
+	ret
+
+	;; updates the cursor location to the current locaiton at dx
+	;; jmped to after every keyboard interupt, so jmps to main after
+update_cursor:
+	push dx						; save dx with logical position
+	push bx
+	add dh, dh					; calculate video position
+	add dl, dl
+	inc dh
+	inc dl
 	mov ah, 2
 	mov bh, 0
-	int 0x10
+	int 0x10					; display interupt
 	pop bx
-	
-	mov ah, 0
-	int 0x16					; Keyboard services
+	pop dx
 	jmp main
 	
 	;; Pad the rest of the file with null bytes and add

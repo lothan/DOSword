@@ -1,4 +1,4 @@
-all: crossword.img crossword.com
+all: crossword.com # crossword.img
 
 SRC := crossword.asm
 IMG := crossword.img
@@ -14,7 +14,7 @@ crossword.img: ${SRC} ${PUZ}
 crossword.com: ${SRC} ${PUZ}
 	python3 prebuild.py ${PUZ} ${SRC}
 	nasm -f bin ${SRC} -l ${COM}.list -Dcom=1 -o ${COM}.intermediate
-	@python3 -c 'print("Crossword COM code is " + str(len(open("${IMG}.intermediate", "rb").read()[:-2].rstrip(b"\x00"))) + " bytes long")'
+	@python3 -c 'print("Crossword COM code is " + str(len(open("${COM}.intermediate", "rb").read()[:-2].rstrip(b"\x00"))) + " bytes long")'
 	cat ${PUZ} ${COM}.intermediate > ${COM}
 
 test-mbr:
