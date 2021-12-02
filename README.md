@@ -9,7 +9,7 @@ Extensive feature set includes:
 * Dark Theme (only)
 
 
-To build, rename your .puz to be `input.puz` and run `make`. If you have DOSBox installed, `make test-com` loads and executes the generated COM file. Maximum puzzle size is 5x5 and a sample puzzle is provided.
+Tested with DOSBox. Maximum puzzle size is 5x5 and a sample puzzle is provided. To build:
 
 ```
 $ make
