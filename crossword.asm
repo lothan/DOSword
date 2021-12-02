@@ -1,5 +1,5 @@
-	;; Crossword puzzle bootloader
-
+	;; Play a (mini) crossword puzzle in DOS
+	
 bits 16
 cpu 8086
 	
@@ -10,7 +10,7 @@ cpu 8086
 %endif
 	
 ;; changed by prebuild.py to load puzzle data as immediates 
-puz_len:    equ 232
+puz_len:    equ 380
 width:      equ 4
 height:     equ 4
 
@@ -18,28 +18,27 @@ height:     equ 4
 col_width:	equ 25
 indent:		equ 4
 
-	
+;; where the .puz file starts
 %if com
 	puz_off:	equ 0x100
 %else
 	puz_off:	equ 0x7c00
 %endif
-	
-across_msg:	equ puz_off + 0x2 	; In .puz specification
+
+;; various fields in the .puz specification
+across_msg:	equ puz_off + 0x2 
 down_msg:	equ puz_off + 0x9
 solution:	equ puz_off + 0x34
 grid:		equ puz_off + 0x34 + (width*height)
 clues:		equ grid + (width*height) + 3 ; after the grid and 3 null bytes
 
-	;; no longer needed - using these as immediates
-	;; puz_width:	equ puz_off + 0x2c
-	;; puz_height:	equ puz_off + 0x2d
-
-	;; Not in .puz specification: used as storage saved over those dumb checksums
+;; Locations for variable memory  
+;; saved over the damn checksums
 next_aloc:	equ puz_off + 0x10
-next_dloc:	equ puz_off + 0x12
-next_clue:	equ puz_off + 0x14
+next_dloc:	equ puz_off + 0x12 	; line with
+next_clue:	equ puz_off + 0x14	; pointer to the next clue's text
 cur_clue:	equ puz_off + 0x16	; the current clue number when initializing
+
 	
 start:
 	mov ax, 0x0002				; Set Video mode 80x25 with color
@@ -49,7 +48,7 @@ start:
 	mov es, ax					; in ES for stosw instructions using DI
 
 	call init_clues
-	
+
 print_puzzle:
 	
 	xor ax, ax					; Zero out AX and DI 
@@ -79,8 +78,8 @@ n1:	cmp byte [bx], 0x2e 		; if it's a black square, go to the next cell
 	add dl, 1
 	call load_grid_pos
 	jmp n1
-		
-	
+
+	;; prints the rows with lines (e.g. +-+-+-+)
 print_line_row:
 	mov byte cl, width
 p2:	call handle_clue			; returns "+" or current clue number
@@ -99,15 +98,12 @@ p3:	mov al, 0x2b				; adds the final "+" and then goes to the next
 	add di, 0xa0-(4*width+2)	; 2 chars per cell with the extra +
 	ret
 
-
 	;; prints the row that should contain user inputted text (i.e. "| | | |)
 print_text_row:
 	mov cx, width+1
 p4:	mov al, 0x7c				; prints "| " width+1 times
 	stosw
-	add di, 2
-	;; 	mov al, 0x20
-	;; 	stosw					
+	add di, 2					; jump over a character 
 	loop p4				
 	
 	add di, 0xa0-(4*width+4)	
@@ -164,9 +160,9 @@ h4:	cmp al, 1					; dh contains whether a clue number exists
 	mov word [cur_clue], bx
 	ret
 
-h5:
+
 	;; print a black square in the square down and to the right of current di
-	push di
+h5:	push di
 	add di, 0xa0+2
 	mov ax, 0x0fdb
 	stosw
@@ -175,7 +171,10 @@ h5:
 h6:	mov ax, 0x0F2B				; return a simple "+" for the cross
 	ret
 
-
+	;; prints both the across and down clues in the right column
+	;; reads the next clue in the .puz file from next_clue
+	;; and uses the number stored in cur_clue
+	;; and writes to bx
 print_clue:
 	push ax
 	push di
@@ -193,20 +192,20 @@ print_clue:
 	stosw
 	mov word si, [next_clue]
 	
-a1:	mov ax, [bx]
-	add ax, col_width*2-2
-	cmp ax, di
-	jne a2
-	mov ax, 0x0f20
+a1:	mov ax, [bx]				; [bx] stores the start of the column 
+	add ax, col_width*2-4		; where the clue is printed. If it is 
+	cmp ax, di					; col_width away from di (current clue
+	jne a2						; printing location) print "\" and
+	mov ax, 0x0f5c
 	stosw
-	mov di, [bx] 		; if so, go to the next line
+	mov di, [bx] 				; go to the next line
 	add di, 0xa0
 	mov [bx], di
 	add di, indent*2
 
 a2:	lodsb
 	cld
-	cmp byte al, 0
+	cmp byte al, 0				; if we get a null byte, leave loop
 	je a3
 	mov ah, 0x0f
 	stosw
@@ -225,7 +224,8 @@ a3:	mov word [next_clue], si
 handle_dclue:	
 	ret
 	
-	
+	;; Just prints "ACROSS" and "DOWN" and sets values
+	;; for the variables next_aloc, nextdloc, cur_clue, and next_clue
 init_clues:	
 	mov di, (col_width+indent)*2 ; print ACROSS at the top of col 2
 	mov si, across_msg
@@ -235,7 +235,7 @@ i1: lodsb
 	stosw
 	loop i1
 
-	mov word [next_aloc], 0xa0+col_width*2			;next across clue goes under ACROSS
+	mov word [next_aloc], 0xa0+col_width*2	; next across clue goes under ACROSS
 	
 	mov di, col_width*4 + indent*2 ;print DOWN at the top of col 3
 	mov si, down_msg
@@ -251,12 +251,11 @@ i2:	lodsb
 	mov word [next_clue], clues	
 	ret
 
-	;;
 	;; Main interactive code run after printing the puzzle
 	;; BX stores pointer to current grid location in puz file
 	;; DX stores location of cursor DL=xpos DH=ypos
-	;; (I know it's different than above, just now looking at int10 specs)
-	;; wtf I read it wrong and it's actually as I originally had it?
+	;; insane that I picked dl and dh like that, and it turns out to be
+	;; the same values the system interupts use for updating the cursor
 main:
 	mov ah, 0
 	int 0x16					; Read input
@@ -264,8 +263,7 @@ main:
 	cmp al, 0x1b				; Escape key
 	je handle_escape
 
-
-	;; no idea where these numbers came from, windows doc has it wrong
+	;; no idea where these numbers came from, windows doc was different
 	;; Got these from here:
 	;; https://stackoverflow.com/questions/16939449/how-to-detect-arrow-keys-in-16-bit-dos-code
 	cmp ah, 0x4B				; Left arrow
@@ -277,11 +275,12 @@ main:
 	cmp ah, 0x50				; Down arrow
  	je handle_down
 
-	sub al, 0x41				; Letter input
-	cmp al, 26
-	ja handle_letter
+	sub al, 0x41				; I thought this was a clever way to check
+	cmp al, 26					; 0x41 < al < 0x5a but it doesn't work -
+	ja handle_letter 			; everything else is a letter
+								; looking back, this is about where I gave up
 	
-	jmp main
+	jmp main					; infinite main loop 
 
 handle_escape:
 	mov di, 0					; clear screen
@@ -442,6 +441,7 @@ update_cursor:
 	
 	;; Pad the rest of the file with null bytes and add
 	;; 0x55AA to the end to make the puzzle and code bootable
+	;; not really neaded anymore because this is no longer an mbr
 %if com=0
 	times (510-puz_len)-($-$$) db 0
 	dw 0xAA55
